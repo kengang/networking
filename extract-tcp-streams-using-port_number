@@ -1,0 +1,85 @@
+### This script extracts tcp stream using port number out of a large network capture 
+### and output each individual stream into pcap files save in the same location 
+### as the original network capture 
+### Author: Ken Mei
+
+$port_of_interest = Read-Host "Enter TCP port Number of interest: "
+
+#####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# modified this to reflect tshark.exe installation location in your system #
+#####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+$tshark = "C:\Program Files\Wireshark\tshark.exe"
+
+#################################
+Function read-input-trace {
+    # Load the required assembly
+    Add-Type -AssemblyName System.Windows.Forms
+
+    # Create an OpenFileDialog object
+    $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+    $OpenFileDialog.InitialDirectory = [Environment]::GetFolderPath('Desktop') # Default directory
+    $OpenFileDialog.Filter = "pcap/pcapng |*.pcap;*.pcapng" # File filter
+    $OpenFileDialog.Title = "Select a file to read"
+
+    # Show the dialog and check if the user selected a file
+    if ($OpenFileDialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        $FilePath = $OpenFileDialog.FileName
+        Write-Host "You selected: $FilePath"
+
+        return $FilePath
+       
+    } else {
+        Write-Host "No file was selected."
+    }
+}
+####################################
+
+$tracefile = read-input-trace
+
+$tracefile_directory = Split-Path -Path $tracefile
+
+$tcp_conversations = & $tshark -r $tracefile -z conv,tcp -q
+
+$cons =@()
+
+foreach ($conversation in $tcp_conversations) {
+    
+    if ($conversation -match ":$port_of_interest") {
+
+        $splitTrimmed = $conversation -split "\s+" | ForEach-Object { $_.trim() }
+
+        $port1 = ($splitTrimmed[0] -split ":")[1]
+        $port2 = ($splitTrimmed[2] -split ":")[1]
+
+        $ports = @{}
+        $ports.port1 = $port1
+        $ports.port2 = $port2
+
+        $cons += $ports
+    }
+}
+
+if ($cons.Count -eq 0) {
+    
+  
+    Write-host "++++++++++++++++++++++++"
+    Write-Host "no tcp stream with port number: " $port_of_interest
+    Write-host "++++++++++++++++++++++++"
+   
+    Write-Host "below are all tcp conversations in the pcap fie"
+    $tcp_conversations
+} else {
+    foreach ($con in $cons) {
+    
+        $filter = "tcp.port == $($con.port1) && tcp.port == $($con.port2)"
+
+        & $tshark -r $tracefile -Y $filter -w "$($tracefile_directory)\tcp.stream-$($con.port1)-$($con.port2).pcap"
+
+     }
+      Write-Host "extraction completed"
+      Write-Host "find your pcap file at: " $tracefile_directory
+}
+
+
+
