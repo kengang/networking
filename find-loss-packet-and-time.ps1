@@ -116,7 +116,7 @@ if ($packet_dupAcks -eq $Null) {
         }
     }
 
-    $lost_packets = &$tshark -r $tracefile -Y $filter_to_get_lost_packets -E "header=no" -T "fields" -e "tcp.seq" -e "tcp.analysis.retransmission" -E "separator=`t"
+    $lost_packets += &$tshark -r $tracefile -Y $filter_to_get_lost_packets -E "header=no" -T "fields" -e "tcp.seq" -e "tcp.analysis.retransmission" -E "separator=`t"
 
     $lostpackets = process_tshark_output -input_array $lost_packets
 
@@ -159,3 +159,4 @@ if ($packet_dupAcks -eq $Null) {
     }
     $output
 }
+
